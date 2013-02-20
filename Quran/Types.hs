@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, OverloadedStrings #-}
 
 module Quran.Types (
   QRefRng
@@ -19,12 +19,30 @@ module Quran.Types (
 , qLines_
 , unQLines
 , fromQLines
+
+, readQtfFiles
+, readQpfFile
+
+, defaultBrkToText
+, addBrksToQtfRng
+
+, GrpStyle (RefRangesOnly, BigBreaks, AllBreaks, ByVerse)
+, applyGrpStyleToRng
 ) where
 
-import Quran.Internal.Types
+import           Prelude hiding ( readFile, lines, unlines )
+import qualified System.IO as S ( readFile )
+import qualified Data.List as S ( lines )
+import qualified Data.Text as T
+import           Data.Text ( Text, lines, pack )
+import           Data.Text.IO
+import           Data.Maybe ( listToMaybe )
+
+import           Quran.Internal.Types
 
 
--- For reference ranges like: "80:1-8"
+-- Type for a reference range, like: "80:1-8".
+-- Single verse refs, like "31:6", are internally represented as "31:6-6".
 newtype QRefRng = MkQRefRng (Int, (Int, Int))
   deriving ( Eq, Ord )
 
@@ -78,7 +96,8 @@ splitRngByPars criterion qpf refRng =
     listToTuples (x:y:rs) = (x, y) : listToTuples rs
 
 
--- Any kind of resource that has 6236 lines (originals, translations, commentaries, break styles, etc.)
+-- Type for holding QTF and QPF files.
+-- It has 6236 lines (could be: originals, translations, commentaries, break styles, etc.)
 newtype QLines a = MkQLines [a]
   deriving ( Show )
 
@@ -98,4 +117,56 @@ class QLinesSelector s where
 instance QLinesSelector Int     where fromQLines (MkQLines ls) n  = [ls !! (n - 1)]
 instance QLinesSelector [Int]   where fromQLines (MkQLines ls) ns = map ((!!) ls . subtract 1) ns
 instance QLinesSelector QRefRng where fromQLines qls           rr = fromQLines qls $ qRefRngToLineNrs rr
+
+
+-- Read QTFs files
+readQtfFiles :: [String] -> IO [QLines Text]  -- TODO: handle IO and parse exceptions
+readQtfFiles files = mapM readFile files >>= mapM (qLines . lines) >>= return
+
+-- Read a QPF file
+readQpfFile :: String -> IO (QLines Int)
+readQpfFile qpfFileName = do
+  qpf <- S.readFile qpfFileName  -- TODO: handle exceptions, like "no valid qpf file" or "file non existant"
+  qLines $ map (\s -> readNumOrZero [head s]) (S.lines qpf) >>= return
+  where
+    readNumOrZero :: String -> Int
+    readNumOrZero s = case (fmap fst . listToMaybe . reads) s of Just i -> i; Nothing -> 0
+
+
+-- The default mapping from QPF numbers to QLF style breaks
+defaultBrkToText :: Int -> Text
+defaultBrkToText brk = case brk of 0 -> " "
+                                   1 -> "\\br "
+                                   2 -> "\\bbr "
+                                   _ -> "\\bbr "
+
+-- Enrich a QTF text with QPF-specified paragraphing into a QLF (LaTeX'ish) output
+addBrksToQtfRng :: QLines Int -> (Int -> Text) -> QLines Text -> QRefRng -> Text
+addBrksToQtfRng qpf brkToText qtf refRng = T.concat $
+  weave3 (map (\rng -> pack $ "\\nr{" ++ show rng ++ "} ") $ splitRngByVerses refRng)
+         (fromQLines qtf refRng)
+         (map (brkToText . head . fromQLines qpf) $ (init . splitRngByVerses) refRng)
+  where
+    weave3 :: [a] -> [a] -> [a] -> [a]
+    weave3 []     _      _      = []  -- ys and zs are woven into xs, so empty
+    weave3 xs     []     _      = xs  -- zs needs ys to be woven into xs
+    weave3 (x:xs) (y:ys) []     = x:y   : weave3 xs ys []
+    weave3 (x:xs) (y:ys) (z:zs) = x:y:z : weave3 xs ys zs
+
+
+-- Intra-text grouping style (what to align in case of side-by-side)
+data GrpStyle = RefRangesOnly  -- only group on ranges (least grouping)
+              | BigBreaks      -- on ranges and big breaks
+              | AllBreaks      -- on ranges and all breaks
+              | ByVerse        -- on individual verses (most grouping)
+                deriving Show
+
+-- Break up a QRefRng into [QRefRng] based on a grouping style and QPF
+applyGrpStyleToRng :: GrpStyle -> QLines Int -> QRefRng -> [QRefRng]
+applyGrpStyleToRng grpStyle qpf refRng = case grpStyle of
+  RefRangesOnly -> [refRng]
+  BigBreaks     -> splitRngByPars (1 <) qpf refRng
+  AllBreaks     -> splitRngByPars (0 <) qpf refRng
+  ByVerse       -> splitRngByVerses refRng
+
 

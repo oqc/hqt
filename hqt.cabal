@@ -1,5 +1,5 @@
 name:               hqt
-version:            0.0.1
+version:            0.0.2
 license:            GPL-3
 license-file:       LICENSE
 author:             Waheed Kneeler <oneknlr@AT-gmail.com>
@@ -33,6 +33,7 @@ library
   exposed-modules:  Quran.Types, Quran.RefParser
   other-modules:    Quran.Internal.Types, Quran.Internal.RefParser
   build-depends:    base,
+                    text,
                     parsec
   ghc-options:      -Wall
                     -O2
