@@ -24,9 +24,9 @@ module Quran.Types (
 , readQpfFile
 
 , defaultBrkToText
-, addBrksToQtfRng
+, qtfRngToQlf
 
-, GrpStyle (RefRangesOnly, BigBreaks, AllBreaks, ByVerse)
+, GrpStyle ( RefRangesOnly, BigBreaks, AllBreaks, ByVerse )
 , applyGrpStyleToRng
 ) where
 
@@ -140,9 +140,9 @@ defaultBrkToText brk = case brk of 0 -> " "
                                    2 -> "\\bbr "
                                    _ -> "\\bbr "
 
--- Enrich a QTF text with QPF-specified paragraphing into a QLF (LaTeX'ish) output
-addBrksToQtfRng :: QLines Int -> (Int -> Text) -> QLines Text -> QRefRng -> Text
-addBrksToQtfRng qpf brkToText qtf refRng = T.concat $
+-- Enrich a QTF text with refs and QPF-specified paragraphing into a QLF (LaTeX'ish) output
+qtfRngToQlf :: QLines Int -> (Int -> Text) -> QLines Text -> QRefRng -> Text
+qtfRngToQlf qpf brkToText qtf refRng = T.concat $
   weave3 (map (\rng -> pack $ "\\nr{" ++ show rng ++ "} ") $ splitRngByVerses refRng)
          (fromQLines qtf refRng)
          (map (brkToText . head . fromQLines qpf) $ (init . splitRngByVerses) refRng)

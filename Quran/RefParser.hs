@@ -2,12 +2,13 @@ module Quran.RefParser (
   parseRefRngs
 ) where
 
-import Text.ParserCombinators.Parsec ( parse, ParseError )
+import Data.Attoparsec.Text ( parseOnly )
+import Data.Text ( Text )
 
-import Quran.Types
 import Quran.Internal.RefParser
+import Quran.Types
 
 
-parseRefRngs :: String -> Either ParseError [QRefRng]
-parseRefRngs = parse refString ""
+parseRefRngs :: Text -> Either String [QRefRng]
+parseRefRngs = parseOnly refString
 

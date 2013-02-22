@@ -7,32 +7,29 @@ module Quran.Internal.RefParser (
 , verseRange
 ) where
 
-import Text.ParserCombinators.Parsec
+import Control.Applicative
+import Data.Attoparsec.Text
+
 import Quran.Types
 
 
-refString :: GenParser Char st [QRefRng]
-refString = do refRngs <- many refRngByChapter
-               eof
-               return $ concat refRngs
+refString :: Parser [QRefRng]
+refString = fmap concat $ refRngByChapter `sepBy1` (char ',') <* endOfInput
 
-refRngByChapter :: GenParser Char st [QRefRng]
-refRngByChapter = do c   <- many digit
-                     _   <- char ':'
+refRngByChapter :: Parser [QRefRng]
+refRngByChapter = do c   <- many digit <* char ':'
                      vs  <- verses
                      rrs <- mapM (qRefRng $ read c) vs
-                     return $ rrs
+                     pure $! rrs
 
-verses :: GenParser Char st [(Int, Int)]
-verses = sepEndBy1 verseNrOrRange (spaces >> char ',' >> spaces) >>= return
+verses :: Parser [(Int, Int)]
+verses = verseNrOrRange `sepBy1` (char ',')
 
-verseNrOrRange, verseNr, verseRange :: GenParser Char st (Int, Int)
-verseNrOrRange = do verseNr <|> verseRange
-verseNr = try $ do n <- many1 digit
-                   notFollowedBy $ oneOf ":-"
-                   return (read n, read n)
-verseRange = try $ do startNr <- many1 digit
-                      (spaces >> char '-' >> spaces)
-                      endNr <- many1 digit
-                      return (read startNr, read endNr)
+verseNrOrRange, verseNr, verseRange :: Parser (Int, Int)
+verseNrOrRange = (try verseNr) <|> (try verseRange)
+verseNr = (\v -> (read v, read v)) <$> many1 digit <* (endOfInput <|> nextIsComma)
+  where nextIsComma = do p <- peekChar
+                         case p of Nothing -> empty
+                                   Just x  -> if x == ',' then pure () else empty
+verseRange = (\v1 v2 -> (read v1, read v2)) <$> (many1 digit <* char '-') <*> many1 digit
 

@@ -1,13 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module QuranSpec.RefParser ( refParserSpec ) where
 
-
-import Quran.Internal.RefParser
+import Data.Attoparsec.Text ( parseOnly )
 import Quran.Types
-
-import Text.ParserCombinators.Parsec ( parse )
-
 import Test.Hspec
 
+import Quran.Internal.RefParser
 
 
 refParserSpec :: Spec
@@ -16,8 +15,8 @@ refParserSpec = do
   describe "verseRange" $ do
     it "should parse a verse range to a [verseNr]" $
       testParser verseRange "1-7" (1, 7)
-    it "allows spaces around the hyphen" $
-      testParser verseRange "1 - 7" (1, 7)
+    it "allows no spaces around the hyphen" $
+      testParserFails verseRange "1 - 7"
 
   describe "verseNr" $ do
     it "should parse series of digits" $
@@ -30,8 +29,6 @@ refParserSpec = do
       testParser verses "1,2,3" [(1, 1), (2, 2), (3, 3)]
     it "should not parse a chapter number" $
       testParser verses "1,2,3:7" [(1, 1), (2, 2)]
-    it "allows spaces arround the commas" $
-      testParser verses "1, 2 ,3" [(1, 1), (2, 2), (3, 3)]
 
   describe "refGrpByChapter" $ do
     it "should parse a simple reference group appropriately" $
@@ -43,11 +40,11 @@ refParserSpec = do
 
   describe "refString" $ do
     it "should parse complex ref strings appropriately" $
-      testParser refString "1:1,2, 2:18, 3:100-103"
+      testParser refString "1:1,2,2:18,3:100-103"
         [qRefRng_ 1 (1, 1), qRefRng_ 1 (2, 2), qRefRng_ 2 (18, 18), qRefRng_ 3 (100, 103)]
 
-  where testParser p str success = case parse p "" str of Left  _ -> False
-                                                          Right x -> x == success
-        testParserFails p str    = case parse p "" str of Left  _ -> True
-                                                          Right _ -> False
+  where testParser p str success = case parseOnly p str of Left  _ -> False
+                                                           Right x -> x == success
+        testParserFails p str    = case parseOnly p str of Left  _ -> True
+                                                           Right _ -> False
 
