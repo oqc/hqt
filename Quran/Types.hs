@@ -21,7 +21,7 @@ module Quran.Types (
 , fromQLines
 
 , readQtfFiles
-, readQpfFile
+, readQpfFiles
 
 , defaultBrkToText
 , qtfRngToQlf
@@ -119,16 +119,16 @@ instance QLinesSelector [Int]   where fromQLines (MkQLines ls) ns = map ((!!) ls
 instance QLinesSelector QRefRng where fromQLines qls           rr = fromQLines qls $ qRefRngToLineNrs rr
 
 
--- Read QTFs files
-readQtfFiles :: [String] -> IO [QLines Text]  -- TODO: handle IO and parse exceptions
+-- Read QTF files
+readQtfFiles :: [FilePath] -> IO [QLines Text]  -- TODO: handle IO and parse exceptions
 readQtfFiles files = mapM readFile files >>= mapM (qLines . lines) >>= return
 
--- Read a QPF file
-readQpfFile :: String -> IO (QLines Int)
-readQpfFile qpfFileName = do
-  qpf <- S.readFile qpfFileName  -- TODO: handle exceptions, like "no valid qpf file" or "file non existant"
-  qLines $ map (\s -> readNumOrZero [head s]) (S.lines qpf) >>= return
+-- Read QPF files
+readQpfFiles :: [FilePath] -> IO [QLines Int]
+readQpfFiles files = mapM S.readFile files >>= mapM rawQpfToQLines >>= return
   where
+    rawQpfToQLines :: Monad m => String -> m (QLines Int)
+    rawQpfToQLines = qLines . (\qpf -> map (\s -> readNumOrZero [head s]) (S.lines qpf))
     readNumOrZero :: String -> Int
     readNumOrZero s = case (fmap fst . listToMaybe . reads) s of Just i -> i; Nothing -> 0
 
