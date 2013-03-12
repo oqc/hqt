@@ -1,7 +1,9 @@
 # Haskell Quran Toolkit
 
-A library for dealing Quran texts, providing the following features:
+A library for dealing Quranic data that provides following features:
 
-* Parsers (for references and soon [data formats](https://github.com/oqc/qdf)).
+* A parser for references (and soon [data formats](https://github.com/oqc/qdf)).
+* Data types for Quranic data and utility functions to deal with them.
 * And more to come... (see [TODO](https://raw.github.com/oqc/hqt/master/TODO)).
+
 

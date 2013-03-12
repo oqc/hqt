@@ -26,43 +26,47 @@ module Quran.Types (
 , defaultBrkToText
 , qtfRngToQlf
 
-, GrpStyle ( RefRangesOnly, BigBreaks, AllBreaks, ByVerse )
+, GrpStyle (RefRangesOnly, BigBreaks, AllBreaks, ByVerse)
 , applyGrpStyleToRng
 ) where
 
-import           Prelude hiding ( readFile, lines, unlines )
-import qualified System.IO as S ( readFile )
-import qualified Data.List as S ( lines )
+import           Prelude hiding (readFile, lines, unlines)
+import qualified System.IO as S (readFile)
+import qualified Data.List as S (lines)
 import qualified Data.Text as T
-import           Data.Text ( Text, lines, pack )
+import           Data.Text (Text, lines, pack)
 import           Data.Text.IO
-import           Data.Maybe ( listToMaybe )
+import           Data.Maybe (listToMaybe)
 
 import           Quran.Internal.Types
 
 
--- Type for a reference range, like: "80:1-8".
+-- | Type for a reference range, like: "80:1-8".
 -- Single verse refs, like "31:6", are internally represented as "31:6-6".
 newtype QRefRng = MkQRefRng (Int, (Int, Int))
-  deriving ( Eq, Ord )
+  deriving (Eq, Ord)
 
 instance Show QRefRng where
   show (MkQRefRng (c, (v1, v2))) = show c ++ ":" ++ show v1 ++ (if v1 == v2 then  ""  else  "-" ++ show v2)
 
+-- | `QRefRng` constructor that does checks reference validity
 qRefRng :: Monad m => Int -> (Int, Int) -> m QRefRng
-qRefRng c (v1, v2)  -- Programming errors here are no substitute for parser exceptions
-  | c < 1 || c > 114 || v1 < 1 || v2 > versesPerChapter !! c =
+qRefRng c (v1, v2)
+  | c  < 1 || c  > 114 ||
+    v1 < 1 || v1 > versesPerChapter !! c ||
+    v2 < 1 || v2 > versesPerChapter !! c =
                 fail $ "Reference inexistant: " ++ (show $ MkQRefRng (c, (v1, v2)))
-  | v1 > v2   = fail $ "Start-verse cannot be larger than end-verse in reference: " ++ (show $ MkQRefRng (c, (v1, v2)))
+  | v1 > v2   = fail $ "Start verse cannot be beyond end verse in reference: " ++ (show $ MkQRefRng (c, (v1, v2)))
   | otherwise = return $ MkQRefRng (c, (v1, v2))
 
+-- | `QRefRng` constructor that does not check validity (but is pure)
 qRefRng_ :: Int -> (Int, Int) -> QRefRng
 qRefRng_ c vs = MkQRefRng (c, vs)
 
 unQRefRng :: QRefRng -> (Int, (Int, Int))
 unQRefRng (MkQRefRng (c, (v1, v2))) = (c, (v1, v2))
 
-chapter ::QRefRng -> Int
+chapter :: QRefRng -> Int
 chapter (MkQRefRng (c, _)) = c
 
 fstVerse :: QRefRng -> Int
@@ -74,15 +78,19 @@ lstVerse (MkQRefRng (_, (_, v2))) = v2
 verseList :: QRefRng -> [Int]
 verseList (MkQRefRng (_, (v1, v2))) = [v1..v2]
 
-qRefRngToLineNr  :: QRefRng -> Int
-qRefRngToLineNr  (MkQRefRng (c, (v1, _)))  = v1 + chapterOffset c
+-- | Get the line number of a reference (according to the QTF-style)
+qRefRngToLineNr :: QRefRng -> Int
+qRefRngToLineNr (MkQRefRng (c, (v1, _))) = v1 + chapterOffset c
 
+-- | Get the line numbers of a list of references (according to the QTF-style)
 qRefRngToLineNrs :: QRefRng -> [Int]
 qRefRngToLineNrs (MkQRefRng (c, (v1, v2))) = map (chapterOffset c +) [v1..v2]
 
+-- | Flattens a reference to a verse-range-free list of reference
 splitRngByVerses :: QRefRng -> [QRefRng]
 splitRngByVerses rr = map (\v -> MkQRefRng (chapter rr, (v, v))) $ verseList rr
 
+-- | Splits a reference on a QPF paragraphing style using a `criterion`
 splitRngByPars :: (Int -> Bool) -> QLines Int -> QRefRng -> [QRefRng]
 splitRngByPars criterion qpf refRng =
   let markedPairs = zip (map criterion $ fromQLines qpf refRng)
@@ -96,13 +104,13 @@ splitRngByPars criterion qpf refRng =
     listToTuples (x:y:rs) = (x, y) : listToTuples rs
 
 
--- Type for holding QTF and QPF files.
+-- | Type for holding QTF and QPF files.
 -- It has 6236 lines (could be: originals, translations, commentaries, break styles, etc.)
 newtype QLines a = MkQLines [a]
-  deriving ( Show )
+  deriving (Show)
 
 qLines :: Monad m => [a] -> m (QLines a)
-qLines ls  -- Programming errors here are no substitute for parser exceptions
+qLines ls
   | length ls /= 6236 = fail $ "The QTF format expects 6236 lines."
   | otherwise         = return $ MkQLines ls
 
@@ -119,11 +127,11 @@ instance QLinesSelector [Int]   where fromQLines (MkQLines ls) ns = map ((!!) ls
 instance QLinesSelector QRefRng where fromQLines qls           rr = fromQLines qls $ qRefRngToLineNrs rr
 
 
--- Read QTF files
+-- | Read QTF files
 readQtfFiles :: [FilePath] -> IO [QLines Text]  -- TODO: handle IO and parse exceptions
 readQtfFiles files = mapM readFile files >>= mapM (qLines . lines) >>= return
 
--- Read QPF files
+-- | Read QPF files
 readQpfFiles :: [FilePath] -> IO [QLines Int]
 readQpfFiles files = mapM S.readFile files >>= mapM rawQpfToQLines >>= return
   where
@@ -133,14 +141,14 @@ readQpfFiles files = mapM S.readFile files >>= mapM rawQpfToQLines >>= return
     readNumOrZero s = case (fmap fst . listToMaybe . reads) s of Just i -> i; Nothing -> 0
 
 
--- The default mapping from QPF numbers to QLF style breaks
+-- | The default mapping from QPF numbers to QLF style breaks
 defaultBrkToText :: Int -> Text
 defaultBrkToText brk = case brk of 0 -> " "
                                    1 -> "\\br "
                                    2 -> "\\bbr "
                                    _ -> "\\bbr "
 
--- Enrich a QTF text with refs and QPF-specified paragraphing into a QLF (LaTeX'ish) output
+-- | Enrich a QTF text with refs and QPF-specified paragraphing into a QLF (LaTeX'ish) output
 qtfRngToQlf :: QLines Int -> (Int -> Text) -> QLines Text -> QRefRng -> Text
 qtfRngToQlf qpf brkToText qtf refRng = T.concat $
   weave3 (map (\rng -> pack $ "\\nr{" ++ show rng ++ "} ") $ splitRngByVerses refRng)
@@ -154,14 +162,14 @@ qtfRngToQlf qpf brkToText qtf refRng = T.concat $
     weave3 (x:xs) (y:ys) (z:zs) = x:y:z : weave3 xs ys zs
 
 
--- Intra-text grouping style (what to align in case of side-by-side)
+-- | Intra-text grouping style (what to align in case of side-by-side)
 data GrpStyle = RefRangesOnly  -- only group on ranges (least grouping)
               | BigBreaks      -- on ranges and big breaks
               | AllBreaks      -- on ranges and all breaks
               | ByVerse        -- on individual verses (most grouping)
                 deriving Show
 
--- Break up a QRefRng into [QRefRng] based on a grouping style and QPF
+-- | Break up a `QRefRng` into `[QRefRng]` based on a grouping style and QPF
 applyGrpStyleToRng :: GrpStyle -> QLines Int -> QRefRng -> [QRefRng]
 applyGrpStyleToRng grpStyle qpf refRng = case grpStyle of
   RefRangesOnly -> [refRng]

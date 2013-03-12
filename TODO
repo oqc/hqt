@@ -7,4 +7,4 @@
 * Provide unicode/arab/etc support, so:
 * It can serve as the basis for 19-claim replication suite
 * Add benchmark (need newer HP for that, 7.6 would be nice)
-
+* Break up Types into QRefRng and QDF
