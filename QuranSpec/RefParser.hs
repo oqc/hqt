@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module QuranSpec.RefParser ( refParserSpec ) where
+module QuranSpec.RefParser (refParserSpec) where
 
-import Data.Attoparsec.Text ( parseOnly )
-import Quran.Types
+import Data.Attoparsec.Text (parseOnly)
 import Test.Hspec
 
+import Quran.Internal.QRefRng
 import Quran.Internal.RefParser
 
 

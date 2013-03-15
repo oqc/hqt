@@ -6,7 +6,7 @@ import Data.Attoparsec.Text ( parseOnly )
 import Data.Text ( Text )
 
 import Quran.Internal.RefParser
-import Quran.Types
+import Quran.QRefRng (QRefRng)
 
 
 parseRefRngs :: Text -> Either String [QRefRng]

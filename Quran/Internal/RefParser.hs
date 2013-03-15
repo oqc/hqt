@@ -11,7 +11,7 @@ module Quran.Internal.RefParser (
 import Control.Applicative ((<*), (<*>), (<$>), (<|>), many, empty, pure)
 import Data.Attoparsec.Text
 
-import Quran.Types (QRefRng, qRefRng)
+import Quran.QRefRng (QRefRng, qRefRng)
 
 
 -- | Parses a string that contains one or more Quran references, like: "1:1-7,31:6"
